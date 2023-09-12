@@ -1,4 +1,4 @@
-# Volatility 3: The volatile memory extraction framework
+# Volatility 3: The volatile memory extraction framework (with pipfile)
 
 Volatility is the world's most widely used framework for extracting digital
 artifacts from volatile memory (RAM) samples. The extraction techniques are
