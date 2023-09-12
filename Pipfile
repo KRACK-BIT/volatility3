@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pefile = ">=2017.8.1"
+yara-python = ">=3.8.0"
+capstone = ">=3.0.5"
+pycryptodome = "*"
+leechcorepyc = ">=2.4.0"
+
+[dev-packages]
+pefile = ">=2017.8.1"
+yara-python = ">=3.8.0"
+capstone = ">=3.0.5"
+pycryptodome = "*"
+jsonschema = ">=2.3.0"
+leechcorepyc = ">=2.4.0"
+
+[requires]
+python_version = "3.11"
