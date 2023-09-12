@@ -1,0 +1,5 @@
+version: "1"
+rules:
+  - base: stable
+    upstream: volatilityfoundation:stable    # change `wei` to the owner of upstream repo
+    mergeMethod: rebase
