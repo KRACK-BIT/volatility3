@@ -245,7 +245,7 @@ class Module(interfaces.context.ModuleInterface):
         """
         if constants.BANG not in object_type:
             object_type = self.symbol_table_name + constants.BANG + object_type
-        else:
+        elif not object_type.startswith(self.symbol_table_name + constants.BANG):
             raise ValueError(
                 "Cannot reference another module when constructing an object"
             )
@@ -256,12 +256,13 @@ class Module(interfaces.context.ModuleInterface):
         if not absolute:
             offset += self._offset
 
-        # Ensure we don't use a layer_name other than the module's, why would anyone do that?
-        if "layer_name" in kwargs:
-            del kwargs["layer_name"]
+        # We have to allow using an alternative layer name due to pool scanners switching
+        # to the memory layer for scanning samples prior to Windows 10.
+        layer_name = kwargs.pop("layer_name", self._layer_name)
+
         return self._context.object(
             object_type=object_type,
-            layer_name=self._layer_name,
+            layer_name=layer_name,
             offset=offset,
             native_layer_name=native_layer_name or self._native_layer_name,
             **kwargs,

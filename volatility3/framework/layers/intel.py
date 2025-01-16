@@ -180,7 +180,9 @@ class Intel(linear.LinearlyMappedLayer):
         position = self._initial_position
         entry = self._initial_entry
 
-        if self.minimum_address > offset > self.maximum_address:
+        if not (
+            self.minimum_address <= (offset & self.address_mask) <= self.maximum_address
+        ):
             raise exceptions.PagedInvalidAddressException(
                 self.name,
                 offset,
@@ -268,10 +270,8 @@ class Intel(linear.LinearlyMappedLayer):
         try:
             # TODO: Consider reimplementing this, since calls to mapping can call is_valid
             return all(
-                [
-                    self._context.layers[layer].is_valid(mapped_offset)
-                    for _, _, mapped_offset, _, layer in self.mapping(offset, length)
-                ]
+                self._context.layers[layer].is_valid(mapped_offset)
+                for _, _, mapped_offset, _, layer in self.mapping(offset, length)
             )
         except exceptions.InvalidAddressException:
             return False

@@ -21,6 +21,14 @@ from volatility3.framework import (
     plugins,
 )
 
+try:
+    import argcomplete
+
+    HAS_ARGCOMPLETE = True
+except ImportError:
+    HAS_ARGCOMPLETE = False
+
+
 # Make sure we log everything
 
 rootlog = logging.getLogger()
@@ -151,11 +159,20 @@ class VolShell(cli.CommandLine):
             default=constants.CACHE_PATH,
             type=str,
         )
-        parser.add_argument(
+        isf_group = parser.add_mutually_exclusive_group()
+        isf_group.add_argument(
             "--offline",
             help="Do not search online for additional JSON files",
             default=False,
             action="store_true",
+        )
+        isf_group.add_argument(
+            "-u",
+            "--remote-isf-url",
+            metavar="URL",
+            help="Search online for ISF json files",
+            default=constants.REMOTE_ISF_URL,
+            type=str,
         )
 
         # Volshell specific flags
@@ -228,6 +245,8 @@ class VolShell(cli.CommandLine):
 
         if partial_args.offline:
             constants.OFFLINE = partial_args.offline
+        elif partial_args.remote_isf_url:
+            constants.REMOTE_ISF_URL = partial_args.remote_isf_url
 
         # Do the initialization
         ctx = contexts.Context()  # Construct a blank context
@@ -276,6 +295,10 @@ class VolShell(cli.CommandLine):
         # Hand the plugin requirements over to the CLI (us) and let it construct the config tree
 
         # Run the argparser
+        if HAS_ARGCOMPLETE:
+            # The autocompletion line must be after the partial_arg handling, so that it doesn't trip it
+            # before all the plugins have been added
+            argcomplete.autocomplete(parser)
         args = parser.parse_args()
 
         vollog.log(
