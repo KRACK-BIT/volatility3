@@ -22,6 +22,13 @@ import traceback
 from typing import Any, Dict, List, Tuple, Type, Union
 from urllib import parse, request
 
+try:
+    import argcomplete
+
+    HAS_ARGCOMPLETE = True
+except ImportError:
+    HAS_ARGCOMPLETE = False
+
 from volatility3.cli import text_filter
 import volatility3.plugins
 import volatility3.symbols
@@ -228,17 +235,34 @@ class CommandLine:
             default=constants.CACHE_PATH,
             type=str,
         )
-        parser.add_argument(
+        isf_group = parser.add_mutually_exclusive_group()
+        isf_group.add_argument(
             "--offline",
             help="Do not search online for additional JSON files",
             default=False,
             action="store_true",
+        )
+        isf_group.add_argument(
+            "-u",
+            "--remote-isf-url",
+            metavar="URL",
+            help="Search online for ISF json files",
+            default=constants.REMOTE_ISF_URL,
+            type=str,
         )
         parser.add_argument(
             "--filters",
             help="List of filters to apply to the output (in the form of [+-]columname,pattern[!])",
             default=[],
             action="append",
+        )
+        parser.add_argument(
+            "--hide-columns",
+            help="Case-insensitive space separated list of prefixes to determine which columns to hide in the output if provided",
+            default=None,
+            action="extend",
+            nargs="*",
+            type=str,
         )
 
         parser.set_defaults(**default_config)
@@ -306,6 +330,8 @@ class CommandLine:
 
         if partial_args.offline:
             constants.OFFLINE = partial_args.offline
+        elif partial_args.remote_isf_url:
+            constants.REMOTE_ISF_URL = partial_args.remote_isf_url
 
         # Do the initialization
         ctx = contexts.Context()  # Construct a blank context
@@ -341,7 +367,9 @@ class CommandLine:
         )
         for plugin in sorted(plugin_list):
             plugin_parser = subparser.add_parser(
-                plugin, help=plugin_list[plugin].__doc__
+                plugin,
+                help=plugin_list[plugin].__doc__,
+                description=plugin_list[plugin].__doc__,
             )
             self.populate_requirements_argparse(plugin_parser, plugin_list[plugin])
 
@@ -351,6 +379,10 @@ class CommandLine:
         # Hand the plugin requirements over to the CLI (us) and let it construct the config tree
 
         # Run the argparser
+        if HAS_ARGCOMPLETE:
+            # The autocompletion line must be after the partial_arg handling, so that it doesn't trip it
+            # before all the plugins have been added
+            argcomplete.autocomplete(parser)
         args = parser.parse_args()
         if args.plugin is None:
             parser.error("Please select a plugin to run")
@@ -466,6 +498,7 @@ class CommandLine:
                 grid = constructed.run()
                 renderer = renderers[args.renderer]()
                 renderer.filter = text_filter.CLIFilter(grid, args.filters)
+                renderer.column_hide_list = args.hide_columns
                 renderer.render(grid)
         except exceptions.VolatilityException as excp:
             self.process_exceptions(excp)
@@ -593,6 +626,10 @@ class CommandLine:
             caused_by = [
                 "A required python module is not installed (install the module and re-run)"
             ]
+        elif isinstance(excp, exceptions.RenderException):
+            general = "Volatility experienced an issue when rendering the output:"
+            detail = f"{excp}"
+            caused_by = ["An invalid renderer option, such as no visible columns"]
         else:
             general = "Volatility encountered an unexpected situation."
             detail = ""
@@ -716,19 +753,17 @@ class CommandLine:
                 """Gets the final filename"""
                 if output_dir is None:
                     raise TypeError("Output directory is not a string")
+
                 os.makedirs(output_dir, exist_ok=True)
 
-                pref_name_array = self.preferred_filename.split(".")
-                filename, extension = (
-                    os.path.join(output_dir, ".".join(pref_name_array[:-1])),
-                    pref_name_array[-1],
-                )
-                output_filename = f"{filename}.{extension}"
+                output_filename = os.path.join(output_dir, self.preferred_filename)
+                filename, extension = os.path.splitext(output_filename)
 
                 counter = 1
                 while os.path.exists(output_filename):
-                    output_filename = f"{filename}-{counter}.{extension}"
+                    output_filename = f"{filename}-{counter}{extension}"
                     counter += 1
+
                 return output_filename
 
         class CLIMemFileHandler(io.BytesIO, CLIFileHandler):
@@ -791,8 +826,16 @@ class CommandLine:
                 if self._file.closed:
                     return None
 
-                self._file.close()
                 output_filename = self._get_final_filename()
+
+                # Update the filename, which may have changed if a file with
+                # the same name already existed. This needs to be done before
+                # closing the file, otherwise FileHandlerInterface will raise
+                # an exception. Also, the preferred_filename setter only allows
+                #  a specific set of characters, where '/' is not in that list
+                self.preferred_filename = os.path.basename(output_filename)
+
+                self._file.close()
                 os.rename(self._name, output_filename)
 
         if direct:

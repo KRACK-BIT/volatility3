@@ -9,13 +9,14 @@ yara-python>=3.8.0
 
 # This is required for several plugins that perform malware analysis and disassemble code.
 # It can also improve accuracy of Windows 8 and later memory samples.
-capstone>=3.0.5
+# FIXME: Version 6.0.0 is incompatible (#1336) so we'll need an adaptor at some point
+capstone>=3.0.5,<6.0.0
 
 # This is required by plugins that decrypt passwords, password hashes, etc.
 pycryptodome
 
 # This is required for memory acquisition via leechcore/pcileech.
-leechcorepyc>=2.4.0
+leechcorepyc>=2.4.0; sys_platform != 'darwin'
 
 # This is required for memory analysis on a Amazon/MinIO S3 and Google Cloud object storage
 gcsfs>=2023.1.0
